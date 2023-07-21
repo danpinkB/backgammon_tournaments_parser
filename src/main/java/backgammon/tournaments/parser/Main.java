@@ -55,25 +55,25 @@ public class Main {
         String countryStr = "";
         int index = str.indexOf("(");
         if (index!=-1){
-
-            for (int i = index; i < str.length(); i++) {
+            int i = index;
+            for (; i < str.length(); i++) {
                 if (str.charAt(i)!=')')
                     country.append(str.charAt(i));
             }
-            countryStr = country.toString();
-            name = str.replace(countryStr,"");
-            countryStr = countryStr.replace("(","").replace(")","");
+
+            name = str.replace(str.substring(index, i),"");
+            countryStr = country.toString().replace("(","").replace(")","");
         }
         else name = str;
-        return new PlayerResult(name, place, countryStr, subTour);
+        return new PlayerResult(name, place.trim(), countryStr, subTour);
     }
 
     public static List<PlayerResult> parsePlaces(String placePlayers, String subTour){
         String[] placePlayerDetails = placePlayers.split("[-:]{1}");
-        if (placePlayerDetails.length ==1) return List.of(parsePlayerNameAndCountry("1",subTour,placePlayerDetails[0]));
+        if (placePlayerDetails.length == 1) return List.of(parsePlayerNameAndCountry("1",subTour,placePlayerDetails[0]));
         if (placePlayerDetails[0].contains("/")) {
             String[] places = placePlayerDetails[0].split("/");
-            String[] names = placePlayerDetails[1].split("/");
+            String[] names = placePlayerDetails[1].split("[/1]{1}");
             if (places.length==1||names.length==1)return List.of(parsePlayerNameAndCountry(placePlayerDetails[0],subTour,placePlayerDetails[1]));
             return List.of(
                     parsePlayerNameAndCountry(places[0],subTour,names[0]),
@@ -84,7 +84,7 @@ public class Main {
     }
     public static List<PlayerResult> parseElement(Element currentElement){
         String currElText = currentElement.text();
-
+        List<PlayerResult> results = new ArrayList<>();
         long colonCount = currElText.chars().filter(ch -> ch == ':').count();
 
         if (colonCount>1){
@@ -93,30 +93,33 @@ public class Main {
                 trophy = trophy.substring(subTourName.length()+1);
                 int c = 1;
                 for (String player: trophy.split(",")) {
-                    return parsePlaces(player, subTourName);
+                    results.addAll(parsePlaces(player, subTourName));
                 }
             }
-//            currentElement = currentElement.nextElementSibling();
-            return null;
+//            currentElement = currentElement.nextElementSibling()
         }
-        String subTourName = currElText.substring(0, currElText.indexOf(':'));
-        currElText = currElText.substring(subTourName.length()+1);
-        for (String subRound : currElText.split(";")) {
-            if (!subRound.contains(":"))
-                for (String occupiedPlace : subRound.split(", (?![^()]*\\))")) {
-                    return parsePlaces(occupiedPlace, subTourName);
-                }
-            else {
-                for (String subSubTour: subRound.split("\\.\\s(?=SUPERJACKPOT)")) {
-                    String[] subSubTourInfo = subSubTour.split(":");
-                    for (String player : subSubTourInfo[1].split(", ")) {
-                        return parsePlaces(player, subTourName + subSubTourInfo[0]);
+        else {
+            String subTourName = currElText.substring(0, currElText.indexOf(':'));
+            currElText = currElText.substring(subTourName.length() + 1);
+            for (String subRound : currElText.split(";")) {
+
+                if (!subRound.contains(":"))
+                    for (String occupiedPlace : subRound.split(", (?![^()]*\\))")) {
+                        results.addAll(parsePlaces(occupiedPlace, subTourName));
+                    }
+                else {
+                    for (String subSubTour : subRound.split("\\.\\s(?=SUPERJACKPOT)")) {
+                        String[] subSubTourInfo = subSubTour.split(":");
+                        for (String player : subSubTourInfo[1].split(", ")) {
+
+                            results.addAll(parsePlaces(player, subTourName + subSubTourInfo[0]));
+                        }
                     }
                 }
             }
         }
 
-        return null;
+        return results;
     }
     public static Triplet<String,String,String> parseCleanPageArgs(Element currentElement){
 //        Element pElement = currentElement.select("p").get(0);
@@ -195,6 +198,7 @@ public class Main {
             while (currentElement.select("hr").size() == 0) {
                 if (currentElement.text().length()>0 && currentElement.text().indexOf(':')!=-1)
                     if (currentElement.select("p").size() == 1) {
+
                         playerResults = parseElement(currentElement);
                         if (playerResults!=null)
                             results.addAll(playerResults);
