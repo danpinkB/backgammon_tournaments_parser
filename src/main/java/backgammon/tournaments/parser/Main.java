@@ -1,10 +1,11 @@
 package backgammon.tournaments.parser;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.*;
@@ -31,7 +32,7 @@ public class Main {
         connection.disconnect();
         return response.toString();
     }
-    public static void main(String[] args) throws IOException, ParseException, SQLException, ClassNotFoundException {
+    public static void main2(String[] args) throws IOException, ParseException, SQLException, ClassNotFoundException {
         String resData = getRequest("http://www.chicagopoint.com/results.html");
         Document resDoc = Jsoup.parse(resData);
         Elements resultsPages = resDoc.select("#pagetop > p:nth-child(5) > a");
@@ -48,13 +49,32 @@ public class Main {
             else parsePageContent(resPageDoc, "hr",connection, Main::cleanPageCurrentElement);
         }
     }
+    public static void main(String[] args) throws IOException {
+        String resData = getRequest("http://www.chicagopoint.com/results.html");
+        Document resDoc = Jsoup.parse(resData);
+        Elements resultsPages = resDoc.select("#pagetop > p:nth-child(5) > a");
+
+//        DbConnection connection = new DbConnection();
+        for (Element el: resultsPages){
+            String resultPageHref = el.attr("href");
+//            String resultPageHref = "http://www.chicagopoint.com/results1998.html";
+            Path path = Paths.get(System.getProperty("user.dir")+String.format("/src/main/resources/%s.html", el.text().strip()));
+            if (!Files.exists(path)) {
+                String resultPageHtml = getRequest(resultPageHref);
+                File file = new File(path.toUri());
+                FileWriter fw = new FileWriter(path.toString());
+                fw.write(resultPageHtml);
+            }
+
+        }
+    }
 
     public static PlayerResult parsePlayerNameAndCountry(String place,String subTour, String str){
         String name="";
         StringBuilder country=new StringBuilder();
         String countryStr = "";
         int index = str.indexOf("(");
-        if (index!=-1){
+        if (index!=-1&&!str.contains("&")){
             int i = index;
             for (; i < str.length(); i++) {
                 if (str.charAt(i)!=')')
@@ -85,39 +105,26 @@ public class Main {
     public static List<PlayerResult> parseElement(Element currentElement){
         String currElText = currentElement.text();
         List<PlayerResult> results = new ArrayList<>();
-        long colonCount = currElText.chars().filter(ch -> ch == ':').count();
 
-        if (colonCount>1){
-            for (String trophy: currElText.split("\\.\\s(?=SUPERJACKPOT|#)")){
-                String subTourName = trophy.substring(0, trophy.indexOf(':'));
-                trophy = trophy.substring(subTourName.length()+1);
-                int c = 1;
-                for (String player: trophy.split(",")) {
-                    results.addAll(parsePlaces(player, subTourName));
+        String subTourName = currElText.substring(0, currElText.indexOf(':'));
+        currElText = currElText.substring(subTourName.length() + 1);
+        for (String subRound : currElText.split(";")) {
+
+            if (!subRound.contains(":"))
+                for (String occupiedPlace : subRound.split(", (?![^()]*\\))")) {
+                    results.addAll(parsePlaces(occupiedPlace, subTourName));
                 }
-            }
-//            currentElement = currentElement.nextElementSibling()
-        }
-        else {
-            String subTourName = currElText.substring(0, currElText.indexOf(':'));
-            currElText = currElText.substring(subTourName.length() + 1);
-            for (String subRound : currElText.split(";")) {
+            else {
+                for (String subSubTour : subRound.split("\\.\\s(?=SUPERJACKPOT)")) {
+                    String[] subSubTourInfo = subSubTour.split(":");
+                    for (String player : subSubTourInfo[1].split(", ")) {
 
-                if (!subRound.contains(":"))
-                    for (String occupiedPlace : subRound.split(", (?![^()]*\\))")) {
-                        results.addAll(parsePlaces(occupiedPlace, subTourName));
-                    }
-                else {
-                    for (String subSubTour : subRound.split("\\.\\s(?=SUPERJACKPOT)")) {
-                        String[] subSubTourInfo = subSubTour.split(":");
-                        for (String player : subSubTourInfo[1].split(", ")) {
-
-                            results.addAll(parsePlaces(player, subTourName + subSubTourInfo[0]));
-                        }
+                        results.addAll(parsePlaces(player, subTourName + subSubTourInfo[0]));
                     }
                 }
             }
         }
+
 
         return results;
     }
