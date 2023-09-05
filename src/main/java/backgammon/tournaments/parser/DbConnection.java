@@ -43,6 +43,7 @@ public class DbConnection {
         prepare.setString(5, result.getName());
         prepare.setString(6, result.getPlace());
         prepare.setString(7, result.getCountry());
+//        System.out.println(prepare.toString());
         prepare.executeUpdate();
     }
 }
