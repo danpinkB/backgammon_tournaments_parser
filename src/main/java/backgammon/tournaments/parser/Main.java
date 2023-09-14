@@ -221,7 +221,6 @@ public class Main {
             currentElement = currentElement.nextElementSibling();
 //            System.out.println(currentElement);
             while (currentElement.select("hr").size() == 0) {
-                System.out.println(currentElement);
                 if (currentElement.text().length()>0 && currentElement.text().indexOf(':')!=-1)
                     if (currentElement.select("p").size() == 1) {
 
